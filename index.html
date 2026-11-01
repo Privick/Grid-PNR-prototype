@@ -1,0 +1,798 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grid PNR</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Carlito:ital,wght@0,400;0,700;1,400&display=swap">
+<style>
+/* Layout: a single railway journey down the page; a sticky station rail on top; the Grid PNR ticket is the recurring object.
+   Deliberately light-only (team's choice for a professional setting), every colour set explicitly. */
+:root {
+  --paper: #FFFFFF;
+  --ink: #2E2E38;
+  --ink-2: #5C5C6B;
+  --line: #D4D4DD;
+  --mist: #F2F2F6;
+  --beam: #FFE600;
+  --beam-soft: #FFF6A8;
+  --sky: #1A9AFA;
+  --sky-soft: #E3F1FE;
+  --good: #1E8449;
+  --warn: #B9770E;
+  --font: Calibri, Carlito, "Segoe UI", Arial, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box }
+html { scroll-behavior: smooth }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto } * { animation: none !important; transition: none !important } }
+body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font); font-size: 17px; line-height: 1.45 }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--paper) }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+h1, h2, h3 { margin: 0; text-wrap: balance; line-height: 1.1 }
+p { margin: 0 }
+.eyebrow { font-size: 13px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2) }
+.num { font-variant-numeric: tabular-nums }
+button, input, select { font: inherit; color: inherit }
+:focus-visible { outline: 3px solid var(--sky); outline-offset: 2px }
+
+/* top rail */
+.rail { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; background: var(--paper); border-bottom: 1px solid var(--line) }
+.rail .wrap { display: flex; align-items: center; gap: 18px; padding-block: 10px }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 20px; text-decoration: none; color: var(--ink); white-space: nowrap }
+.beam { width: 34px; height: 14px; background: var(--beam); clip-path: polygon(0 100%, 100% 0, 100% 45%, 0 100%) }
+.stations { display: flex; gap: 4px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none }
+.stations a { display: flex; align-items: center; gap: 6px; padding: 6px 10px; text-decoration: none; color: var(--ink-2); font-size: 15px; white-space: nowrap; border-radius: 4px }
+.stations a b { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--ink); font-size: 12px; color: var(--ink) }
+.stations a:hover { background: var(--mist); color: var(--ink) }
+.stations a.on b { background: var(--beam) }
+.tag { font-size: 13px; color: var(--ink-2); border: 1px dashed var(--ink-2); padding: 3px 8px; white-space: nowrap }
+@media (max-width: 760px) { .tag { display: none } .stations a span { display: none } }
+
+/* sections */
+section { padding-block: 64px; border-bottom: 1px solid var(--line) }
+.sec-head { display: grid; grid-template-columns: 120px 1fr; gap: 24px; margin-bottom: 32px }
+.sec-no { font-size: 64px; font-weight: 700; line-height: .9; color: var(--ink); -webkit-text-stroke: 0; }
+.sec-no span { background: linear-gradient(transparent 62%, var(--beam) 62%) }
+.sec-head h2 { font-size: clamp(28px, 4vw, 40px) }
+.sec-head p { margin-top: 10px; color: var(--ink-2); max-width: 65ch }
+@media (max-width: 760px) { .sec-head { grid-template-columns: 1fr; gap: 8px } .sec-no { font-size: 44px } }
+
+/* hero */
+.hero { padding-block: 56px 64px; background: linear-gradient(180deg, var(--mist), var(--paper)) }
+.hero .wrap { display: grid; grid-template-columns: 1.05fr .95fr; gap: 48px; align-items: center }
+.hero h1 { font-size: clamp(40px, 6vw, 72px); letter-spacing: -.01em }
+.hero h1 em { font-style: normal; background: linear-gradient(transparent 60%, var(--beam) 60%) }
+.hero .lede { font-size: 20px; color: var(--ink-2); margin-top: 18px; max-width: 52ch }
+.cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 26px }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px; font-weight: 700; border: 2px solid var(--ink); background: var(--ink); color: var(--paper); text-decoration: none; cursor: pointer; border-radius: 3px }
+.btn.alt { background: var(--paper); color: var(--ink) }
+.btn.y { background: var(--beam); border-color: var(--beam); color: var(--ink) }
+.btn:hover { filter: brightness(1.08) }
+.hero-note { margin-top: 18px; font-size: 14px; color: var(--ink-2) }
+@media (max-width: 900px) { .hero .wrap { grid-template-columns: 1fr } }
+
+/* ticket */
+.ticket { background: var(--paper); border: 2px dashed var(--ink); position: relative; box-shadow: 0 10px 30px rgba(46,46,56,.10) }
+.ticket::before, .ticket::after { content: ""; position: absolute; top: 96px; width: 22px; height: 22px; border-radius: 50%; background: var(--mist); border: 2px dashed var(--ink) }
+.ticket::before { left: -12px } .ticket::after { right: -12px }
+.t-top { background: var(--ink); color: var(--paper); display: flex; justify-content: space-between; gap: 12px; padding: 10px 18px; font-size: 14px; font-weight: 700; letter-spacing: .06em }
+.t-main { display: grid; grid-template-columns: auto 1fr; gap: 18px; padding: 18px 22px; align-items: center; border-bottom: 2px dashed var(--line) }
+.t-status { font-size: 64px; font-weight: 700; line-height: 1; padding: 6px 14px; background: var(--mist) }
+.t-status.rac { background: var(--beam) }
+.t-status.cnf { background: var(--ink); color: var(--beam) }
+.t-status-lbl { font-size: 20px; font-weight: 700 }
+.t-status-sub { color: var(--ink-2); font-size: 15px; margin-top: 2px }
+.t-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 }
+.t-grid div { padding: 12px 18px; border-right: 1px solid var(--line) }
+.t-grid div:last-child { border-right: none }
+.t-grid small { display: block; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2) }
+.t-grid b { font-size: 22px }
+.t-path { display: flex; align-items: center; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--line); font-size: 15px; flex-wrap: wrap }
+.t-path span { padding: 2px 8px; border: 1px solid var(--line); color: var(--ink-2) }
+.t-path span.on { border-color: var(--ink); background: var(--beam); color: var(--ink); font-weight: 700 }
+.t-cond { padding: 10px 18px 14px; font-size: 14px; color: var(--ink-2) }
+@media (max-width: 520px) { .t-status { font-size: 44px } .t-grid { grid-template-columns: 1fr } .t-grid div { border-right: none; border-bottom: 1px solid var(--line) } }
+
+/* panels */
+.two { display: grid; grid-template-columns: 1.35fr 1fr; gap: 28px; align-items: start }
+.two > * { min-width: 0 }
+@media (max-width: 900px) { .two { grid-template-columns: 1fr } }
+.panel { border: 1px solid var(--line); background: var(--paper) }
+.panel-h { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 16px; background: var(--ink); color: var(--paper); font-weight: 700; letter-spacing: .05em; text-transform: uppercase; font-size: 14px }
+.panel-b { padding: 16px }
+.seg { display: inline-flex; border: 1.5px solid var(--ink); border-radius: 3px; overflow: hidden }
+.seg button { border: none; background: var(--paper); padding: 6px 12px; cursor: pointer; font-size: 15px }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); font-weight: 700 }
+.controls { display: flex; gap: 14px 22px; flex-wrap: wrap; align-items: center; margin-bottom: 14px }
+.ctl { display: grid; gap: 4px; font-size: 14px; color: var(--ink-2) }
+input[type=range] { width: 100%; accent-color: var(--ink) }
+.readout { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line) }
+.readout div { background: var(--paper); padding: 12px 14px }
+.readout small { display: block; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2) }
+.readout b { font-size: 26px; display: block; line-height: 1.15 }
+.readout span { font-size: 14px; color: var(--ink-2) }
+@media (max-width: 560px) { .readout { grid-template-columns: 1fr } }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px }
+.chip { font-size: 14px; padding: 4px 10px; background: var(--mist); border-left: 4px solid var(--sky) }
+.note { font-size: 14px; color: var(--ink-2); margin-top: 12px }
+svg text { font-family: var(--font); fill: var(--ink) }
+.chart-box { overflow-x: auto }
+
+/* workloads */
+.wl { display: grid; gap: 8px }
+.wl-row { display: grid; grid-template-columns: minmax(0, 1fr) 70px auto; gap: 12px; align-items: center; padding: 10px 12px; background: var(--mist); border-left: 5px solid var(--line) }
+.wl-row[data-k="P"] { border-left-color: var(--ink) }
+.wl-row[data-k="S"] { border-left-color: var(--sky) }
+.wl-row[data-k="T"] { border-left-color: var(--beam) }
+.wl-row strong { display: block }
+.wl-row small { color: var(--ink-2); font-size: 14px }
+.wl-mw { text-align: right; font-weight: 700 }
+.wl .seg button { padding: 5px 9px; font-size: 14px }
+@media (max-width: 560px) { .wl-row { grid-template-columns: 1fr auto } .wl-row .seg { grid-column: 1 / -1 } }
+.bar { display: flex; height: 34px; margin: 14px 0 6px; border: 1px solid var(--ink) }
+.bar i { display: flex; align-items: center; justify-content: center; font-style: normal; font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; transition: flex .3s }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 14px; color: var(--ink-2) }
+.legend i { display: inline-block; width: 12px; height: 12px; margin-right: 5px; vertical-align: -1px }
+
+/* checks */
+.checks { display: grid; gap: 8px; margin-top: 8px }
+.checks label { display: flex; gap: 10px; align-items: flex-start; padding: 9px 12px; background: var(--mist); cursor: pointer }
+.checks input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--ink); flex: none }
+.field { display: grid; gap: 4px; margin-bottom: 12px; font-size: 14px; color: var(--ink-2) }
+.field input[type=text], .field select { padding: 8px 10px; border: 1.5px solid var(--line); background: var(--paper); font-size: 16px; color: var(--ink) }
+
+/* event */
+.log { font-size: 14px; display: grid; gap: 4px; max-height: 210px; overflow-y: auto; margin-top: 10px }
+.log div { display: grid; grid-template-columns: 52px 1fr; gap: 8px; padding: 4px 0; border-bottom: 1px dotted var(--line) }
+.log b { font-variant-numeric: tabular-nums }
+.sla { display: inline-flex; align-items: center; gap: 6px; font-weight: 700 }
+.sla i { width: 12px; height: 12px; border-radius: 50%; background: var(--good); display: inline-block }
+.sla.warn i { background: var(--warn) }
+
+/* engine */
+.engine { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 28px; align-items: start }
+@media (max-width: 960px) { .engine { grid-template-columns: 1fr } }
+.sl { display: grid; gap: 2px; margin-bottom: 14px }
+.sl-top { display: flex; justify-content: space-between; font-size: 15px }
+.sl-top b { font-variant-numeric: tabular-nums }
+.sl small { font-size: 13px; color: var(--ink-2) }
+.verdict { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); margin-bottom: 16px }
+.verdict div { background: var(--paper); padding: 12px 14px }
+.verdict div.hero-n { background: var(--sky-soft) }
+.verdict div.hero-n.neg { background: var(--mist) }
+.verdict small { display: block; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2) }
+.verdict b { font-size: 28px; display: block; line-height: 1.15 }
+.verdict span { font-size: 13px; color: var(--ink-2) }
+@media (max-width: 700px) { .verdict { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px }
+.presets button { border: 1.5px solid var(--ink); background: var(--paper); padding: 5px 10px; font-size: 14px; cursor: pointer; border-radius: 3px }
+.presets button[aria-pressed="true"] { background: var(--beam); font-weight: 700 }
+.cover { font-size: 14px; padding: 8px 12px; margin-top: 10px; background: var(--mist); border-left: 5px solid var(--sky) }
+.cover.bad { border-left-color: #C0392B }
+.match { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; padding: 4px 10px; background: var(--beam-soft); margin-bottom: 12px }
+.reset { background: none; border: 1.5px solid var(--ink); padding: 6px 12px; cursor: pointer; font-weight: 700; border-radius: 3px }
+
+footer { padding-block: 40px 56px; background: var(--mist) }
+footer .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; font-size: 14px; color: var(--ink-2) }
+footer h3 { font-size: 16px; color: var(--ink); margin-bottom: 8px }
+footer ul { margin: 0; padding-left: 18px; display: grid; gap: 4px }
+footer a { color: var(--ink) }
+@media (max-width: 760px) { footer .cols { grid-template-columns: 1fr } }
+</style>
+
+<header class="rail">
+  <div class="wrap">
+    <a class="brand" href="#top"><span class="beam" aria-hidden="true"></span>Grid PNR</a>
+    <nav class="stations" aria-label="Sections">
+      <a href="#day"><b>1</b><span>The grid's day</span></a>
+      <a href="#sort"><b>2</b><span>Sort the load</span></a>
+      <a href="#ticket"><b>3</b><span>Check PNR</span></a>
+      <a href="#event"><b>4</b><span>Grid call</span></a>
+      <a href="#value"><b>5</b><span>Value engine</span></a>
+    </nav>
+    <span class="tag">Prototype · simulated data</span>
+  </div>
+</header>
+
+<div class="hero" id="top">
+  <div class="wrap">
+    <div>
+      <div class="eyebrow">RAC for the Grid · Team Dynamic</div>
+      <h1 style="margin-top:10px">Your AI campus is on the <em>waitlist</em>. Check its Grid PNR.</h1>
+      <p class="lede">RAC doesn't build wires faster; it lets more megawatts use the wires that exist. The building flexes every day, the GPUs ease only when the grid calls, and an independent verifier proves it. In return a campus could connect now and move to firm power when new lines arrive. The utility always decides.</p>
+      <div class="cta">
+        <a class="btn y" href="#sort">Sort your load</a>
+        <a class="btn alt" href="#value">Open the value engine</a>
+      </div>
+      <p class="hero-note">Tariffs from MERC Case 75 of 2025. Economics from the team's model v7. Campus data, workloads and grid events are simulated.</p>
+    </div>
+    <div id="heroTicket"></div>
+  </div>
+</div>
+
+<section id="day">
+  <div class="wrap">
+    <div class="sec-head"><div class="sec-no"><span>01</span></div><div>
+      <h2>The grid's day: cheap at noon, dear after sunset</h2>
+      <p>Maharashtra's tariff now prices time. In solar hours the energy charge falls; from 5 pm to midnight it rises 20%. Drag through the day to see what RAC does each hour.</p></div></div>
+    <div class="two">
+      <div class="panel">
+        <div class="panel-h"><span>Energy charge by hour, ₹ per kVAh</span><span id="dayTag" class="num"></span></div>
+        <div class="panel-b">
+          <div class="controls">
+            <div class="ctl">Season<div class="seg" id="segSeason"><button aria-pressed="false" data-v="AS">Apr - Sep</button><button aria-pressed="true" data-v="OM">Oct - Mar</button></div></div>
+            <div class="ctl">Year<div class="seg" id="segYear"><button aria-pressed="false" data-v="2027">FY27</button><button aria-pressed="true" data-v="2028">FY28</button></div></div>
+            <div class="ctl">Tariff category<div class="seg" id="segCat"><button aria-pressed="true" data-v="HTI">HT I registered</button><button aria-pressed="false" data-v="HTII">HT II</button></div></div>
+          </div>
+          <div class="chart-box"><svg id="dayChart" viewBox="0 0 720 270" width="100%" role="img" aria-label="Energy charge by hour"></svg></div>
+          <label class="ctl" for="hour" style="margin-top:8px">Hour of day: <b id="hourLbl" class="num" style="color:var(--ink)"></b></label>
+          <input type="range" id="hour" min="0" max="23" value="19">
+        </div>
+      </div>
+      <div style="display:grid;gap:16px">
+        <div class="readout">
+          <div><small>Rate at this hour</small><b id="rdRate" class="num"></b><span id="rdBand"></span></div>
+          <div><small>RAC action</small><b id="rdAct" style="font-size:20px"></b><span id="rdActSub"></span></div>
+          <div><small>Peak minus solar</small><b id="rdGap" class="num"></b><span>₹ per kVAh shifted, before overhead</span></div>
+        </div>
+        <div class="panel"><div class="panel-b">
+          <div class="eyebrow">Observed on the power exchange, 10 Apr 2026</div>
+          <div class="chips"><span class="chip">12:00 · ₹0.4 per kWh</span><span class="chip">19:00 · ₹10 per kWh, the legal ceiling</span></div>
+          <p class="note">Exchange prices show the system's stress; a campus pays its retail tariff, which is what the chart shows. Rates are MERC-approved energy charges with the time-of-day adjustment; wheeling and demand charges are not shown. The financial model uses the 25% annual blend of the two seasonal rebates.</p>
+        </div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="sort">
+  <div class="wrap">
+    <div class="sec-head"><div class="sec-no"><span>02</span></div><div>
+      <h2>Sort the load: the building flexes daily, the GPUs only on a grid call</h2>
+      <p>Layer 1 is the building: pre-cooling, setpoints and dedicated storage (where installed) shift power every day without touching compute. UPS batteries don't count. Layer 2 is the GPUs: tag each workload; protected work is never touched, and shiftable or throttleable work eases only when the grid calls. The mix is an illustrative AI campus.</p></div></div>
+    <div class="two">
+      <div class="panel">
+        <div class="panel-h"><span>Workloads, share of IT load</span><span class="num" id="itTag"></span></div>
+        <div class="panel-b">
+          <label class="ctl" for="itmw">Campus IT load: <b id="itLbl" class="num" style="color:var(--ink)"></b></label>
+          <input type="range" id="itmw" min="10" max="150" step="1" value="50">
+          <label class="ctl" for="bld" style="margin-top:10px">Layer 1, daily building flex (pre-cooling, setpoints, dedicated storage; team estimate): <b id="bldLbl" class="num" style="color:var(--ink)"></b></label>
+          <input type="range" id="bld" min="5" max="30" step="1" value="15">
+          <div class="eyebrow" style="margin-top:14px">Layer 2, GPU workloads on a grid call</div>
+          <div class="wl" id="wl" style="margin-top:8px"></div>
+        </div>
+      </div>
+      <div style="display:grid;gap:16px">
+        <div class="panel"><div class="panel-b">
+          <div class="eyebrow">Your campus, sorted</div>
+          <div class="bar" id="mixBar"></div>
+          <div class="legend"><span><i style="background:var(--ink)"></i>Protected</span><span><i style="background:var(--sky)"></i>Shiftable</span><span><i style="background:var(--beam)"></i>Throttleable</span></div>
+        </div></div>
+        <div class="readout">
+          <div><small>Daily: the building</small><b id="rsFlex" class="num"></b><span id="rsFlexPct"></span></div>
+          <div><small>Grid call: the GPUs</small><b id="rsGrid" class="num"></b><span id="rsGridSub"></span></div>
+          <div><small>Saving a year</small><b id="rsSave" class="num"></b><span id="rsSaveSub"></span></div>
+        </div>
+        <p class="note">Why two layers: an hour of GPU compute is worth far more than the ~₹3 per kWh a daily shift saves, so busy GPUs are not idled for bill savings. Saving = daily building flex × 3 h a day × 85% of days × net saving per kWh at the FY30 tariff, less 5% overhead. Model v7 base: 15% of IT load, a team estimate (LBNL lists cooling setpoints and storage as levers); three hours of pre-cooling may need chilled-water storage, and UPS batteries hold only 5-15 minutes, so they are excluded. The pilot tests pre-cooling alone first; any storage capex and running cost is deducted from the customer's saving before Gate G2. Even at 8% daily flex, Case C NPV stays +₹2.1 cr. 25% is the ceiling where spare compute exists. GPU flex (Phoenix field test: 25% for 3 h) earns an earlier connection, not a bill saving. The pilot measures both.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="ticket">
+  <div class="wrap">
+    <div class="sec-head"><div class="sec-no"><span>03</span></div><div>
+      <h2>Check the Grid PNR: from waitlist to confirmed</h2>
+      <p>The ticket moves only when evidence arrives. Set how much firm capacity the substation can give now; the rest must be covered by GPU flex on grid calls. Tick the gates as they would pass in a pilot.</p></div></div>
+    <div class="two">
+      <div id="mainTicket"></div>
+      <div class="panel"><div class="panel-h"><span>Campus and gates</span><span>simulated</span></div><div class="panel-b">
+        <label class="field" for="cname">Campus name<input type="text" id="cname" value="Example AI campus"></label>
+        <label class="field" for="cloc">Location<select id="cloc"><option>Navi Mumbai</option><option>Pune</option><option>Thane</option><option>Bengaluru</option></select></label>
+        <label class="field" for="firm">Firm capacity available now vs requested: <b id="firmLbl" class="num" style="color:var(--ink)"></b><input type="range" id="firm" min="0" max="50" step="0.5" value="37.5"></label>
+        <div class="cover" id="cover"></div>
+        <div class="checks" id="gates">
+          <label><input type="checkbox" data-g="g0" checked> <span><b>Gate 0</b> · bill, interval data and workload rules shared; package price tested at ₹25-40 lakh per IT MW</span></label>
+          <label><input type="checkbox" data-g="g1"> <span><b>G1 technical</b> · ≥80% of contracted MW on 2-4 h notice, no SLA breach</span></label>
+          <label><input type="checkbox" data-g="g2"> <span><b>G2 economic</b> · customer keeps a positive saving after fees and any chilled-water storage cost</span></label>
+          <label><input type="checkbox" data-g="g3"> <span><b>G3 grid</b> · utility study names the constraint the flex relieves</span></label>
+          <label><input type="checkbox" data-g="g4"> <span><b>G4 route</b> · a lawful flexible-connection route is approved</span></label>
+          <label><input type="checkbox" data-g="cnf"> <span><b>New lines energised</b> · campus moves to firm supply</span></label>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<section id="event">
+  <div class="wrap">
+    <div class="sec-head"><div class="sec-no"><span>04</span></div><div>
+      <h2>A 7 pm grid call: GPUs ease on notice, live AI keeps running</h2>
+      <p>Run the event. The call is scheduled 2-4 hours ahead, so training checkpoints calmly; GPU load steps down, holds, then returns with a small rebound. A 15-minute call is kept only as an emergency option. An independent verifier logs every step: the TTE (Travelling Ticket Examiner), an Independent Verification Agency empanelled by the discom and not involved in programme design or implementation, as the MERC DF & DSM Regulations 2024 provide.</p></div></div>
+    <div class="two">
+      <div class="panel">
+        <div class="panel-h"><span>Campus GPU (IT) load, MW, 18:30 - 21:30</span><span class="sla" id="sla"><i></i>SLA safe</span></div>
+        <div class="panel-b">
+          <div class="controls">
+            <label class="ctl" for="dur" style="min-width:200px">Event length: <b id="durLbl" class="num" style="color:var(--ink)"></b><input type="range" id="dur" min="30" max="120" step="15" value="60"></label>
+            <label class="ctl" style="flex-direction:row;display:flex;gap:8px;align-items:center;color:var(--ink)"><input type="checkbox" id="emg" style="width:18px;height:18px;accent-color:var(--ink)"> Emergency (15-min notice)</label>
+            <label class="ctl" style="flex-direction:row;display:flex;gap:8px;align-items:center;color:var(--ink)"><input type="checkbox" id="ovr" style="width:18px;height:18px;accent-color:var(--ink)"> Customer override at 19:40</label>
+            <button class="btn" id="runEv" type="button">Run the 7 pm call</button>
+          </div>
+          <div class="chart-box"><svg id="evChart" viewBox="0 0 720 260" width="100%" role="img" aria-label="Campus load during a grid event"></svg></div>
+        </div>
+      </div>
+      <div style="display:grid;gap:16px">
+        <div class="readout">
+          <div><small>Peak relief</small><b id="evMW" class="num"></b><span>IT MW, at the hold</span></div>
+          <div><small>Energy moved</small><b id="evMWh" class="num"></b><span>MWh out of the peak</span></div>
+          <div><small>Delivered</small><b id="evDel" class="num"></b><span>of contracted MWh</span></div>
+        </div>
+        <div class="panel"><div class="panel-h"><span>Verifier log</span><span>independent verifier (TTE)</span></div><div class="panel-b"><div class="log" id="log"></div></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="value">
+  <div class="wrap">
+    <div class="sec-head"><div class="sec-no"><span>05</span></div><div>
+      <h2>The value engine: what has to be true for this to pay</h2>
+      <p>These sliders run the same formulas as the team's Excel model v7, FY27 to FY36. The presets show the upside levers; none is in the base. Case C assumes a lawful flex-connection route exists; Case B is software and paid assessments only.</p></div></div>
+    <div class="engine">
+      <div class="panel"><div class="panel-h"><span>Assumptions</span><button class="reset" id="reset" type="button" style="color:var(--paper);border-color:var(--paper)">Reset to v7</button></div><div class="panel-b" id="sliders"></div></div>
+      <div style="min-width:0">
+        <div class="presets" id="presets" role="group" aria-label="Upside levers"><button type="button" data-p="base" aria-pressed="true">Base v7</button><button type="button" data-p="L1">Fee ₹40 lakh</button><button type="button" data-p="L2">Park deals 3/yr</button><button type="button" data-p="L12">Both</button><button type="button" data-p="L12_F8">Both, 8% daily flex</button></div>
+        <div class="match" id="match"></div>
+        <div class="verdict">
+          <div class="hero-n" id="vNpvBox"><small>Case C NPV</small><b id="vNpv" class="num"></b><span id="vRate"></span></div>
+          <div><small>IRR</small><b id="vIrr" class="num"></b><span>Case C</span></div>
+          <div><small>Break-even fee</small><b id="vBe" class="num"></b><span>₹ lakh per IT MW</span></div>
+          <div><small>Case B NPV</small><b id="vB" class="num"></b><span>no route</span></div>
+          <div><small>EBITDA positive</small><b id="vEbd" class="num"></b><span>Case C</span></div>
+          <div><small>Payback</small><b id="vPay" class="num"></b><span>Case C</span></div>
+          <div><small>Peak funding</small><b id="vPeak" class="num"></b><span>Case C, incl. 20% buffer</span></div>
+          <div><small>Route odds needed</small><b id="vOdds" class="num"></b><span>break-even hurdle, not a forecast</span></div>
+        </div>
+        <div class="panel"><div class="panel-h"><span>Revenue and EBITDA, ₹ crore</span><span class="legend" style="color:var(--paper)"><span><i style="background:var(--line)"></i>Case B revenue</span><span><i style="background:var(--sky)"></i>Case C revenue</span><span><i style="background:var(--beam)"></i>Case C EBITDA</span></span></div>
+          <div class="panel-b chart-box"><svg id="finChart" viewBox="0 0 720 280" width="100%" role="img" aria-label="Revenue and EBITDA by year"></svg></div></div>
+        <p class="note">Tariff: the financial model and this engine use a 25% annual blended solar rebate from FY28; the hourly tariff chart in section 01 shows the seasonal 20% (Apr-Sep) and 30% (Oct-Mar) rates. NPV at CAPM 14.8% plus the residual premium you set; no terminal value unless recurring software cash flow is positive in FY36. The route-odds figure is a break-even threshold from the decision tree, not a forecast.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap cols">
+    <div>
+      <h3>What is real and what is simulated</h3>
+      <ul>
+        <li>Real: MERC tariff path and time-of-day rules; model v7 formulas; field-test evidence of 25% GPU flexibility for 3 h; published regulator positions (Ofgem, AEMC) and LBNL research.</li>
+        <li>Simulated: the campus, its workload mix, the grid event and the verifier log.</li>
+        <li>Hypotheses to test: the ₹25-40 lakh package price, the 15% daily building flex, the flex-connection route, deal flow of one to two agreements a year.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Sources</h3>
+      <ul>
+        <li>MERC Order, Case No. 75 of 2025 (25 Mar 2026): HT tariff schedules, Table 8 time-of-day</li>
+        <li>MSEDCL Commercial Circular 275: HT I applies to registered IT/ITeS units</li>
+        <li><a href="https://www.bigmint.co/insights/detail/india-faces-power-glut-by-day-shortage-by-night-as-demand-grows-746957" target="_blank" rel="noopener">BigMint on IEX prices, April 2026</a></li>
+        <li><a href="https://arxiv.org/html/2507.00909v1" target="_blank" rel="noopener">Phoenix AI flexibility field test, arXiv 2507.00909</a></li>
+        <li><a href="https://eta-publications.lbl.gov/sites/default/files/2026-07/integrading_ai_data_centers_with_the_power_grid.pdf" target="_blank" rel="noopener">LBNL, Integrating AI Data Centers with the Power Grid (May 2026)</a></li>
+        <li><a href="https://www.ofgem.gov.uk/sites/default/files/2026-06/demand-connections-reform-update-June.pdf" target="_blank" rel="noopener">Ofgem, Connect Update: Demand Connections Reform (16 Jun 2026)</a></li>
+        <li><a href="https://www.aemc.gov.au/sites/default/files/2026-07/AEMC%20advice%20on%20data%20centre%20regulatory%20pathways%20-%20Summary%20for%20Ministers_0.pdf" target="_blank" rel="noopener">AEMC advice on data centre regulatory pathways (Jul 2026)</a></li>
+        <li>FSR Global with APEPDCL CoE (Mar 2026): scheduled flexibility on 2-4 h notice</li>
+        <li>Team Dynamic, RAC_Grid_Full_Model_v7 (EY-Parthenon case competition 2026)</li>
+      </ul>
+    </div>
+  </div>
+</footer>
+
+<script>
+// Port of RAC_Grid_Full_Model_v7 (two-layer flexibility) (Ops_Build -> Financials -> Valuation). Rs crore unless stated.
+const DEFAULTS = {
+  H: 3, AV: 0.85, T1: 7.45, T2: 0.20, T3: 0.20, T3B: 0.25, OV: 0.05, P1: 0.20, P2: 5,
+  F1: 0.15, F2: 0.10, F3: 0, W1: 0.60, W2: 0.50, W3: 0, K1: 7000, S1: 0.45,
+  G1: 0.15, SH32: 0.05, SHG: 0.02, SITE: null, GCF: 0.25, GCH: 85, RAS: 2028, RAF: 0.35, RAD: 0.18, RCV: 2,
+  CNS: 2030, CNY: 2033, CN1: 1, CN2: 2, CNM: 50, CNF: 25, CNA: 1 / 3, PE: 0.70, CNC: 0.15,
+  CTC: 24, CTI: 0.07, CLD: 0.30, CLV: 1.0, ICG: 3.5, IVA: 0.08, CYB: 0.25, CYG: 0.07,
+  REG: 0.40, REG2: 0.25, PIL0: 0.20, PIL: 1.50, SMF: 0.20, SMV: 0.08, GAF: 0.30, GAV: 0.03,
+  CPX: 1.5, LAB: 0.50, ARD: 60, APD: 30, TAX: 0.2517, RFR: 0.0747, DSP: 0.0187, ERP: 0.0708,
+  BETA: 1.30, ESP: 0.05, TVG: 0.05, M27: 5, ECPATH: { 2027: 8.44 / 7.45, 2028: 8.23 / 7.45, 2029: 7.52 / 7.45 },
+};
+const YEARS = [2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035, 2036];
+const FTE = [4, 7, 8, 9, 10, 11, 12, 14, 16, 18];
+const FTE_L = [4, 7, 6, 6, 6, 6, 7, 8, 9, 10];
+const ARCH = [[52, 2028, "S1", 0.5], [100, 2029, "S1", 0.3], [50, 2029, "S1", 0.3], [100, 2030, "S2", 0.2], [30, 2030, "S1", 0.3], [50, 2030, "S1", 0.2], [80, 2031, "S2", 0.15]];
+
+function runModel(over) {
+  const p = Object.assign({}, DEFAULTS, over || {});
+  if (!(over && over.SITE)) p.SITE = p.CNM * p.F1; // v7: daily flexible MW per site linked to campus size x daily share
+  const n = YEARS.length;
+  const S2 = (1 - p.S1) * 0.36, S3 = 1 - p.S1 - S2;
+  const samBase = p.K1 * (p.S1 * p.F1 * p.W1 + S2 * p.F2 * p.W2 + S3 * p.F3 * p.W3);
+  const mwh = p.H * 365 * p.AV;
+  const fseg = { S1: p.F1, S2: p.F2, S3: p.F3 };
+  const o = {}; const z = () => new Array(n).fill(0);
+  ["mf", "pipe", "sam", "share", "live", "nw", "avg", "sites", "t1", "t3", "netk", "savmw", "feemw", "nass", "cnc", "cen", "cxmw", "cxavg",
+   "revA", "revI", "revR", "revC1", "revC2", "revAx", "revIx", "ctc", "ppl", "pplL", "cldf", "cldv", "icg", "rad", "iva", "cyb", "reg", "pil", "smf", "gaf", "cnx", "cxv", "capx", "dep"].forEach(k => o[k] = z());
+  YEARS.forEach((y, i) => {
+    o.mf[i] = i === 0 ? p.M27 / 12 : 1;
+    o.pipe[i] = ARCH.reduce((s, a) => s + (a[1] <= y ? a[0] * fseg[a[2]] * Math.min(1, a[3]) : 0), 0);
+    o.sam[i] = y <= 2031 ? samBase : o.sam[i - 1] * (1 + p.G1);
+    o.share[i] = y <= 2031 ? 0 : (y === 2032 ? p.SH32 : o.share[i - 1] + p.SHG);
+    o.live[i] = y <= 2031 ? o.pipe[i] : Math.max(o.pipe[i], o.share[i] * o.sam[i]);
+    o.nw[i] = i === 0 ? o.live[i] : Math.max(0, o.live[i] - o.live[i - 1]);
+    o.avg[i] = i === 0 ? o.live[i] / 2 : (o.live[i] + o.live[i - 1]) / 2;
+    o.sites[i] = Math.ceil(o.live[i] / p.SITE - 1e-9);
+    o.t1[i] = p.T1 * (p.ECPATH[y] || 1);
+    o.t3[i] = y === 2027 ? p.T3 : p.T3B;
+    o.netk[i] = o.t1[i] * (p.T2 + o.t3[i]) - p.OV * o.t1[i] * (1 - o.t3[i]);
+    o.savmw[i] = mwh * 1000 * o.netk[i] / 100000;
+    o.feemw[i] = o.savmw[i] * p.P1;
+  });
+  YEARS.forEach((y, i) => {
+    const nextNew = i < n - 1 ? o.nw[i + 1] : o.nw[i];
+    o.nass[i] = y < p.RAS ? 0 : nextNew / p.SITE * p.RCV;
+    o.cnc[i] = y < p.CNS ? 0 : (y < p.CNY ? p.CN1 : p.CN2);
+    o.cen[i] = i === 0 ? 0 : o.cnc[i - 1] * p.PE;
+    o.cxmw[i] = (i === 0 ? 0 : o.cxmw[i - 1]) + o.cen[i] * p.SITE;
+    o.cxavg[i] = i === 0 ? o.cxmw[i] / 2 : (o.cxmw[i] + o.cxmw[i - 1]) / 2;
+    o.revA[i] = o.avg[i] * o.feemw[i] / 100;
+    o.revI[i] = o.nw[i] * p.P2 / 100;
+    o.revR[i] = o.nass[i] * p.RAF;
+    o.revC1[i] = o.cnc[i] * p.CNM * p.CNF / 100 * p.CNA;
+    o.revC2[i] = i === 0 ? 0 : o.cnc[i - 1] * p.CNM * p.CNF / 100 * (1 - p.CNA) * p.PE;
+    o.revAx[i] = o.cxavg[i] * o.feemw[i] / 100;
+    o.revIx[i] = o.cen[i] * p.SITE * p.P2 / 100;
+    o.ctc[i] = i === 0 ? p.CTC : o.ctc[i - 1] * (1 + p.CTI);
+    o.ppl[i] = FTE[i] * o.ctc[i] / 100 * o.mf[i];
+    o.pplL[i] = FTE_L[i] * o.ctc[i] / 100 * o.mf[i];
+    o.cldf[i] = p.CLD * o.mf[i];
+    o.cldv[i] = o.live[i] * p.CLV / 100;
+    o.icg[i] = o.nw[i] * p.ICG / 100;
+    o.rad[i] = o.nass[i] * p.RAD;
+    o.iva[i] = o.sites[i] * p.IVA;
+    o.cyb[i] = i === 0 ? 0.05 : (i === 1 ? p.CYB : o.cyb[i - 1] * (1 + p.CYG));
+    o.reg[i] = (y <= 2030 ? p.REG : p.REG2) * o.mf[i];
+    o.pil[i] = y === 2027 ? p.PIL0 : (y === 2028 ? p.PIL : 0);
+    o.smf[i] = p.SMF * o.mf[i];
+    o.gaf[i] = p.GAF * o.mf[i];
+    o.cnx[i] = o.cnc[i] * p.CNC;
+    o.cxv[i] = o.cen[i] * p.SITE * p.ICG / 100 + o.cxmw[i] * p.CLV / 100 + o.cxmw[i] / p.SITE * p.IVA;
+    o.capx[i] = i === 0 ? FTE[i] * p.CPX / 100 : Math.max(0, FTE[i] - FTE[i - 1]) * p.CPX / 100 + (y === 2028 ? p.LAB : 0);
+  });
+  YEARS.forEach((y, i) => { let s = 0; for (let k = Math.max(0, i - 2); k <= i; k++) s += o.capx[k]; o.dep[i] = s / 3; });
+
+  const CASES = {
+    A: { rev: ["revA", "revI"], extra: [], ppl: "pplL" },
+    B: { rev: ["revA", "revI", "revR"], extra: ["rad"], ppl: "pplL" },
+    C: { rev: ["revA", "revI", "revR", "revC1", "revC2", "revAx", "revIx"], extra: ["rad", "cnx", "cxv"], ppl: "ppl" },
+  };
+  const BASEC = ["cldf", "cldv", "icg", "iva", "cyb", "reg", "pil", "smf", "gaf"];
+  const r = p.RFR - p.DSP + p.BETA * p.ERP + p.ESP;
+  const capm = p.RFR - p.DSP + p.BETA * p.ERP;
+  const npv = (rate, arr) => arr.reduce((s, v, i) => s + v / Math.pow(1 + rate, i + 1), 0);
+  const out = { ops: o, rate: r, capm };
+  for (const [k, c] of Object.entries(CASES)) {
+    const f = { rev: z(), opx: z(), ebd: z(), ebit: z(), cum: z(), tax: z(), wc: z(), dwc: z(), fcf: z(), cfc: z() };
+    YEARS.forEach((y, i) => {
+      f.rev[i] = c.rev.reduce((s, x) => s + o[x][i], 0);
+      f.opx[i] = [c.ppl].concat(BASEC, c.extra).reduce((s, x) => s + o[x][i], 0) + (p.SMV + p.GAV) * f.rev[i];
+      f.ebd[i] = f.rev[i] - f.opx[i];
+      f.ebit[i] = f.ebd[i] - o.dep[i];
+      f.cum[i] = (i === 0 ? 0 : f.cum[i - 1]) + f.ebit[i];
+      f.tax[i] = p.TAX * (Math.max(0, f.cum[i]) - (i === 0 ? 0 : Math.max(0, f.cum[i - 1])));
+      f.wc[i] = f.rev[i] * p.ARD / 365 - BASEC.concat(c.extra).reduce((s, x) => s + o[x][i], 0) * p.APD / 365;
+      f.dwc[i] = i === 0 ? f.wc[i] : f.wc[i] - f.wc[i - 1];
+      f.fcf[i] = f.ebd[i] - f.tax[i] - o.capx[i] - f.dwc[i];
+      f.cfc[i] = (i === 0 ? 0 : f.cfc[i - 1]) + f.fcf[i];
+    });
+    const L = n - 1;
+    let rec = o.revA[L] + (k === "C" ? o.revAx[L] : 0);
+    let varc = o.cldv[L] + o.iva[L] + (p.SMV + p.GAV) * rec + (k === "C" ? o.cxmw[L] * p.CLV / 100 + o.cxmw[L] / p.SITE * p.IVA : 0);
+    let ovh = o[c.ppl][L] + o.cldf[L] + o.cyb[L] + o.reg[L] + o.smf[L] + o.gaf[L];
+    let one = p.TVG * o.live[L] * (p.P2 - p.ICG) / 100 * (1 - p.SMV - p.GAV) + (k !== "A" ? p.TVG * o.live[L] / p.SITE * p.RCV * (p.RAF * (1 - p.SMV - p.GAV) - p.RAD) : 0);
+    const nebd = rec - varc - ovh + one;
+    const nfcf = nebd - p.TAX * Math.max(0, nebd - o.dep[L]) - o.dep[L] - p.TVG * f.wc[L];
+    const tvAt = rate => nfcf > 0 ? nfcf * (1 + p.TVG) / (rate - p.TVG) : 0;
+    const tv = tvAt(r);
+    const npvExplicit = npv(r, f.fcf);
+    const npvTotal = npvExplicit + tv / Math.pow(1 + r, n);
+    const npvCapm = npv(capm, f.fcf) + tvAt(capm) / Math.pow(1 + capm, n);
+    const irrSeries = f.fcf.slice(); irrSeries[L] += tv;
+    const ebdPos = YEARS.find((y, i) => f.ebd[i] > 0);
+    const payback = YEARS.find((y, i) => f.cfc[i] >= 0);
+    const peak = -Math.min(0, ...f.cfc) * 1.2;
+    out[k] = { f, npvExplicit, npvTotal, npvCapm, tv, irr: irr(irrSeries), ebdPos, payback, peak,
+      stopPilotCapm: npv(capm, f.fcf.slice(0, 2)), stopGate0Capm: npv(capm, f.fcf.slice(0, 1)) };
+  }
+  const C = out.C, fail = Math.max(C.stopPilotCapm, out.B.npvCapm);
+  let cum = 0; out.flexLaneMW = o.cen.map(v => (cum += v) * p.CNM); out.gridCallMW = out.flexLaneMW.map(v => v * p.GCF);
+  out.oddsToday = C.npvCapm <= 0 ? null : (fail >= 0 ? 0 : -fail / (C.npvCapm - fail));
+  return out;
+}
+function irr(cf) {
+  const f = rr => cf.reduce((s, v, i) => s + v / Math.pow(1 + rr, i), 0);
+  let lo = -0.9, hi = 3;
+  if (f(lo) * f(hi) > 0) return null;
+  for (let k = 0; k < 200; k++) { const m = (lo + hi) / 2; (f(lo) * f(m) <= 0) ? hi = m : lo = m; }
+  return (lo + hi) / 2;
+}
+function breakEvenFee(over) {
+  let lo = 0, hi = 100;
+  const g = fee => runModel(Object.assign({}, over, { CNF: fee })).C.npvTotal;
+  if (g(hi) < 0) return null; if (g(lo) > 0) return 0;
+  for (let k = 0; k < 60; k++) { const m = (lo + hi) / 2; g(m) > 0 ? hi = m : lo = m; }
+  return (lo + hi) / 2;
+}
+if (typeof module !== "undefined") module.exports = { runModel, breakEvenFee, DEFAULTS, YEARS };
+
+</script>
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const fmt = (v, d = 1) => v.toLocaleString("en-IN", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const crore = v => (v < 0 ? "−₹" : "₹") + fmt(Math.abs(v), 1) + " cr";
+  const S = { season: "OM", year: 2028, cat: "HTI", hour: 19, itmw: 50, bld: 15, gates: { g0: true }, mix: null };
+  const EC = { HTI: { 2027: 8.44, 2028: 8.23, 2030: 7.45 }, HTII: { 2027: 13.72, 2028: 13.29, 2030: 12.23 } };
+
+  function bandOf(h) { return h >= 9 && h < 17 ? "solar" : (h >= 17 ? "peak" : "normal"); }
+  function rebate() { return S.year === 2027 ? (S.season === "AS" ? 0.15 : 0.25) : (S.season === "AS" ? 0.20 : 0.30); }
+  function rate(h) { const ec = EC[S.cat][S.year]; const b = bandOf(h); return ec * (b === "solar" ? 1 - rebate() : b === "peak" ? 1.20 : 1); }
+  function segs(id, key, cb) {
+    $(id).addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+      $(id).querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
+      S[key] = key === "year" ? +b.dataset.v : b.dataset.v; cb(); });
+  }
+
+  /* ---------- 1. day chart ---------- */
+  function drawDay() {
+    const W = 720, H = 270, x0 = 44, y0 = 222, bw = (W - x0 - 10) / 24, max = 18;
+    let g = "";
+    for (let v = 0; v <= max; v += 6) { const y = y0 - v / max * 190; g += `<line x1="${x0}" x2="${W - 8}" y1="${y}" y2="${y}" stroke="#E6E6EC"/><text x="${x0 - 8}" y="${y + 5}" font-size="14" text-anchor="end">${v}</text>`; }
+    for (let h = 0; h < 24; h++) {
+      const r = rate(h), b = bandOf(h), y = y0 - r / max * 190, x = x0 + h * bw + 2;
+      const fill = b === "solar" ? "#1A9AFA" : b === "peak" ? "#2E2E38" : "#C9C9D3";
+      g += `<rect x="${x}" y="${y}" width="${bw - 4}" height="${y0 - y}" fill="${fill}" opacity="${h === S.hour ? 1 : .72}"/>`;
+      if (h === S.hour) g += `<rect x="${x - 2}" y="${y - 4}" width="${bw}" height="${y0 - y + 4}" fill="none" stroke="#FFE600" stroke-width="3"/>`;
+      if (h % 3 === 0) g += `<text x="${x + (bw - 4) / 2}" y="${y0 + 20}" font-size="14" text-anchor="middle">${String(h).padStart(2, "0")}</text>`;
+    }
+    g += `<line x1="${x0}" x2="${W - 8}" y1="${y0}" y2="${y0}" stroke="#2E2E38"/>`;
+    g += `<text x="${x0 + 9 * bw + 4 * bw}" y="22" font-size="14" text-anchor="middle" font-weight="700">Solar hours 09-17</text>`;
+    g += `<text x="${x0 + 17 * bw + 3.5 * bw}" y="22" font-size="14" text-anchor="middle" font-weight="700">Peak 17-24</text>`;
+    g += `<text x="${x0 + 4.5 * bw}" y="22" font-size="14" text-anchor="middle" font-weight="700">Normal</text>`;
+    $("dayChart").innerHTML = g;
+    const r = rate(S.hour), b = bandOf(S.hour);
+    $("hourLbl").textContent = String(S.hour).padStart(2, "0") + ":00";
+    $("rdRate").textContent = "₹" + fmt(r, 2);
+    $("rdBand").textContent = b === "solar" ? `Solar rebate −${Math.round(rebate() * 100)}%` : b === "peak" ? "Peak surcharge +20%" : "No time-of-day adjustment";
+    $("rdAct").textContent = b === "solar" ? "Pre-cool, charge" : b === "peak" ? "Coast; GPUs if called" : "Run as normal";
+    $("rdActSub").textContent = b === "solar" ? "chilled water and dedicated storage bank cheap power" : b === "peak" ? "building runs on stored cooling; GPUs ease only on a grid call" : "protected work always runs";
+    $("rdGap").textContent = "₹" + fmt(rate(19) - rate(12), 2);
+    $("dayTag").textContent = (S.cat === "HTI" ? "HT I" : "HT II") + " · FY" + String(S.year).slice(2) + (S.year === 2028 ? "+" : "");
+  }
+  segs("segSeason", "season", () => { drawDay(); });
+  segs("segYear", "year", () => { drawDay(); });
+  segs("segCat", "cat", () => { drawDay(); drawSort(); drawTickets(); });
+  $("hour").addEventListener("input", e => { S.hour = +e.target.value; drawDay(); });
+
+  /* ---------- 2. sort ---------- */
+  const WL = [
+    ["Live inference", "chat, search and copilots answering users", 40, "P"],
+    ["APIs and payments", "customer-facing transactions", 20, "P"],
+    ["Storage and networking", "always-on platform load", 15, "P"],
+    ["Model training", "checkpointed runs that can pause", 12, "S"],
+    ["Batch inference", "overnight scoring and embeddings", 6, "S"],
+    ["Analytics and ETL", "reports and data pipelines", 4, "T"],
+    ["Backups and replication", "deadline in hours, not minutes", 3, "S"],
+  ];
+  S.mix = WL.map(w => w[3]);
+  function saveMwYear() {
+    const p = { T1: S.cat === "HTI" ? 7.45 : 12.23 };
+    const m = runModel(p); return { sav: m.ops.savmw[3], fee: m.ops.feemw[3] };
+  }
+  function flexShare() { return WL.reduce((s, w, i) => s + (S.mix[i] !== "P" ? w[2] : 0), 0) / 100; }
+  function bldMW() { return S.itmw * S.bld / 100; }
+  function drawSort() {
+    $("itLbl").textContent = S.itmw + " MW";
+    $("itTag").textContent = S.itmw + " MW IT";
+    $("wl").innerHTML = WL.map((w, i) => `<div class="wl-row" data-k="${S.mix[i]}"><div><strong>${w[0]}</strong><small>${w[1]}</small></div>
+      <div class="wl-mw num">${fmt(S.itmw * w[2] / 100, 1)} MW</div>
+      <div class="seg" data-i="${i}" role="group" aria-label="${w[0]}">${["P", "S", "T"].map(k => `<button type="button" data-k="${k}" aria-pressed="${S.mix[i] === k}">${k === "P" ? "Protect" : k === "S" ? "Shift" : "Throttle"}</button>`).join("")}</div></div>`).join("");
+    const sh = { P: 0, S: 0, T: 0 }; WL.forEach((w, i) => sh[S.mix[i]] += w[2]);
+    $("mixBar").innerHTML = `<i style="flex:${sh.P};background:var(--ink);color:var(--paper)">${sh.P}%</i><i style="flex:${sh.S};background:var(--sky);color:var(--paper)">${sh.S ? sh.S + "%" : ""}</i><i style="flex:${sh.T};background:var(--beam);color:var(--ink)">${sh.T ? sh.T + "%" : ""}</i>`;
+    const fx = flexShare() * S.itmw, sv = saveMwYear(), bd = bldMW();
+    $("bldLbl").textContent = S.bld + "% of IT load = " + fmt(bd, 1) + " MW";
+    $("rsFlex").textContent = fmt(bd, 1) + " MW";
+    $("rsFlexPct").textContent = S.bld + "% of IT load, every day";
+    $("rsGrid").textContent = fmt(fx, 1) + " MW";
+    $("rsGridSub").textContent = Math.round(flexShare() * 100) + "% of IT load, ≤85 h a year, 2-4 h notice";
+    $("rsSave").textContent = "₹" + fmt(bd * sv.sav / 100, 2) + " cr";
+    $("rsSaveSub").textContent = (S.cat === "HTI" ? "HT I" : "HT II") + ", FY30, before Dynamic's 20% fee of ₹" + fmt(bd * sv.fee / 100, 2) + " cr";
+    drawTickets();
+  }
+  $("wl").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; const i = +b.closest(".seg").dataset.i; S.mix[i] = b.dataset.k; drawSort(); });
+  $("itmw").addEventListener("input", e => { S.itmw = +e.target.value; $("firm").max = S.itmw; $("firm").value = Math.round(0.75 * S.itmw * 2) / 2; drawSort(); });
+  $("bld").addEventListener("input", e => { S.bld = +e.target.value; drawSort(); });
+
+  /* ---------- 3. tickets ---------- */
+  function status() {
+    const g = S.gates;
+    if (g.cnf && g.g4) return "CNF";
+    if (g.g0 && g.g1 && g.g2 && g.g3 && g.g4 && covered()) return "RAC";
+    return "WL";
+  }
+  function firmMW() { return Math.min(+$("firm").value, S.itmw); }
+  const fm1 = v => Math.abs(v - Math.round(v)) < 1e-9 ? fmt(v, 0) : fmt(v, 1);
+  function covered() { return flexShare() * S.itmw + 1e-9 >= S.itmw - firmMW(); }
+  function pnr() { let h = 0; const s = ($("cname").value || "") + $("cloc").value; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; return String(h % 9000000000 + 1000000000); }
+  function ticketHTML(compact) {
+    const st = status(), fx = flexShare() * S.itmw, sv = saveMwYear();
+    const fee = runModel().ops && 25 * S.itmw / 100; // Rs cr at Rs 25 lakh/IT MW
+    const days = fee / (0.682 * S.itmw) * 30;
+    const nf = S.itmw - firmMW();
+    const lbl = { WL: ["Waitlisted", "Requested " + S.itmw + " MW; firm capacity available now " + fm1(firmMW()) + " MW"], RAC: ["Ride now, flex at peak", fm1(firmMW()) + " MW firm + " + fm1(nf) + " MW non-firm on the wires that exist"], CNF: ["Confirmed", "Firm supply; daily building flex keeps earning savings"] }[st];
+    const need = [["g0", "Gate 0"], ["g1", "G1"], ["g2", "G2"], ["g3", "G3"], ["g4", "G4"]].filter(x => !S.gates[x[0]]).map(x => x[1]);
+    const cond = st === "WL" ? (need.length ? "Next gates: " + need.join(", ") + ". The utility decides on any connection." : (covered() ? "All gates passed." : "Gates passed, but GPU flex is smaller than the non-firm part: tag more work or wait for firm capacity."))
+      : st === "RAC" ? "Illustrative pilot terms: GPUs ease only on grid calls, up to 85 h a year on 2-4 h notice (15 min only in emergencies); protected work never cut."
+      : "Flex-connection fee earned in full; the campus stays a software customer.";
+    return `<div class="ticket"><div class="t-top"><span>GRID PNR ${pnr()}</span><span>${($("cname").value || "Campus").replace(/[<>&]/g, "")} · ${$("cloc").value}</span></div>
+      <div class="t-main"><div class="t-status ${st.toLowerCase()}">${st}</div><div><div class="t-status-lbl">${lbl[0]}</div><div class="t-status-sub">${lbl[1]}</div></div></div>
+      <div class="t-grid"><div><small>IT load</small><b class="num">${S.itmw} MW</b></div><div><small>Daily / grid-call</small><b class="num">${fmt(bldMW(), 1)} / ${fmt(fx, 1)} MW</b></div><div><small>Saving / yr</small><b class="num">₹${fmt(bldMW() * sv.sav / 100, 1)} cr</b></div></div>
+      ${compact ? "" : `<div class="t-grid" style="border-top:1px solid var(--line)"><div><small>Feasibility study</small><b class="num">₹35 lakh</b></div><div><small>Package fee</small><b class="num">₹${fmt(fee, 1)} cr</b></div><div><small>= carrying cost of</small><b class="num">~${Math.round(days)} days</b></div></div>`}
+      <div class="t-path"><span class="${st === "WL" ? "on" : ""}">WL</span>→<span class="${st === "RAC" ? "on" : ""}">RAC</span>→<span class="${st === "CNF" ? "on" : ""}">CNF</span></div>
+      <div class="t-cond">${cond}${compact ? "" : " The ₹35 lakh study checks feasibility first. The separate package (application, controls and verification set-up, regulator pack) is a priced hypothesis at ₹25 lakh per IT MW, ~0.4% of campus capex, paid 1/3 at agreement and 2/3 at energisation; never a payment for queue position. Carrying cost is an illustrative upper bound."}</div></div>`;
+  }
+  function drawTickets() { if ($("cover")) drawCover(); $("heroTicket").innerHTML = ticketHTML(true); $("mainTicket").innerHTML = ticketHTML(false); }
+  $("gates").addEventListener("change", e => { const c = e.target; if (c.dataset.g) { S.gates[c.dataset.g] = c.checked; drawTickets(); } });
+  ["cname", "cloc"].forEach(id => $(id).addEventListener("input", drawTickets));
+  function drawCover() {
+    const fx = flexShare() * S.itmw, nf = S.itmw - firmMW(), ok = covered();
+    $("firmLbl").textContent = fm1(firmMW()) + " of " + S.itmw + " MW (" + Math.round(firmMW() / S.itmw * 100) + "% firm)";
+    $("cover").className = "cover" + (ok ? "" : " bad");
+    $("cover").textContent = ok ? "Non-firm " + fmt(nf, 1) + " MW is covered by " + fmt(fx, 1) + " MW of GPU flex on grid calls." : "Non-firm " + fmt(nf, 1) + " MW is more than the " + fmt(fx, 1) + " MW of GPU flex: RAC cannot cover it.";
+  }
+  $("firm").addEventListener("input", () => { drawCover(); drawTickets(); });
+
+  /* ---------- 4. grid event ---------- */
+  let evT = 0, evTimer = null;
+  function evProfile() {
+    const fx = flexShare() * S.itmw, prot = S.itmw - fx, dur = +$("dur").value, ovr = $("ovr").checked;
+    const pts = []; // minute 0 = 18:30, to 21:30 (180 min)
+    const call = 30, endHold = call + 15 + dur, ovrAt = 70; // 19:40
+    for (let m = 0; m <= 180; m++) {
+      let f = fx;
+      if (m >= call && m < call + 15) f = fx * (1 - (m - call) / 15);
+      else if (m >= call + 15 && m < endHold) f = 0;
+      else if (m >= endHold && m < endHold + 15) f = fx * ((m - endHold) / 15) * 1.0;
+      else if (m >= endHold + 15 && m < endHold + 45) f = fx * 1.05;
+      if (ovr && m >= ovrAt && m < endHold) f = Math.max(f, fx * 0.5);
+      pts.push({ m, prot, f });
+    }
+    return { pts, fx, prot, dur, call, endHold, ovr, ovrAt };
+  }
+  function hhmm(m) { const t = 18 * 60 + 30 + m; return String(Math.floor(t / 60)).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0"); }
+  function drawEvent(upto) {
+    const P = evProfile(), W = 720, H = 260, x0 = 44, y0 = 214, sx = (W - x0 - 12) / 180, max = Math.ceil(S.itmw * 1.1 / 10) * 10;
+    const Y = v => y0 - v / max * 186;
+    let g = "";
+    for (let v = 0; v <= max; v += max / 4) g += `<line x1="${x0}" x2="${W - 10}" y1="${Y(v)}" y2="${Y(v)}" stroke="#E6E6EC"/><text x="${x0 - 8}" y="${Y(v) + 5}" font-size="14" text-anchor="end">${Math.round(v)}</text>`;
+    g += `<rect x="${x0 + P.call * sx}" y="${Y(max)}" width="${(P.endHold - P.call) * sx}" height="${y0 - Y(max)}" fill="#FFF6A8"/>`;
+    g += `<text x="${x0 + P.call * sx + 6}" y="${Y(max) + 18}" font-size="14" font-weight="700">Grid call</text>`;
+    const lim = Math.min(180, upto);
+    let prot = `M${x0} ${Y(P.prot)} `, tot = `M${x0} ${Y(P.prot + P.pts[0].f)} `;
+    for (let m = 1; m <= lim; m++) { tot += `L${x0 + m * sx} ${Y(P.prot + P.pts[m].f)} `; }
+    prot += `L${x0 + lim * sx} ${Y(P.prot)}`;
+    let area = tot + `L${x0 + lim * sx} ${Y(P.prot)} L${x0} ${Y(P.prot)} Z`;
+    g += `<path d="${area}" fill="#1A9AFA" opacity=".25"/>`;
+    g += `<rect x="${x0}" y="${Y(P.prot)}" width="${lim * sx}" height="${y0 - Y(P.prot)}" fill="#2E2E38" opacity=".12"/>`;
+    g += `<path d="${prot}" stroke="#2E2E38" stroke-width="2.5" fill="none"/><path d="${tot}" stroke="#1A9AFA" stroke-width="3" fill="none"/>`;
+    for (let m = 0; m <= 180; m += 30) g += `<text x="${x0 + m * sx}" y="${y0 + 20}" font-size="14" text-anchor="${m === 180 ? "end" : m === 0 ? "start" : "middle"}">${hhmm(m)}</text>`;
+    g += `<line x1="${x0}" x2="${W - 10}" y1="${y0}" y2="${y0}" stroke="#2E2E38"/>`;
+    g += `<text x="${W - 14}" y="${Y(P.prot) + 18}" font-size="14" text-anchor="end">Protected ${fmt(P.prot, 1)} MW</text>`;
+    $("evChart").innerHTML = g;
+    // metrics on completed portion
+    let shed = 0, contract = 0;
+    for (let m = P.call; m < Math.min(P.endHold, lim); m++) { shed += (P.fx - P.pts[m].f) / 60; contract += (m < P.call + 15 ? P.fx * (m - P.call) / 15 : P.fx) / 60; }
+    const holdF = P.pts[Math.min(lim, P.call + 20)].f;
+    $("evMW").textContent = fmt(lim >= P.call + 15 ? P.fx - holdF : 0, 1);
+    $("evMWh").textContent = fmt(shed, 1);
+    $("evDel").textContent = contract > 0 ? Math.round(shed / contract * 100) + "%" : "-";
+    const warn = P.ovr && lim >= P.ovrAt;
+    $("sla").className = "sla" + (warn ? " warn" : "");
+    $("sla").lastChild.textContent = warn ? "Override logged" : "SLA safe";
+    const L = [];
+    const emg = $("emg").checked;
+    if (!emg) L.push(["15:00", "Scheduled call from discom/SLDC for 19:00, 4 h notice (simulated); training set to checkpoint at 18:55"]);
+    if (lim >= 0) L.push([hhmm(0), "Baseline locked: " + fmt(P.prot + P.fx, 1) + " MW, protected " + fmt(P.prot, 1) + " MW"]);
+    if (emg && lim >= 15) L.push(["18:45", "EMERGENCY call from SLDC, 15-min notice (tested option, simulated)"]);
+    if (lim >= P.call) L.push([hhmm(P.call), emg ? "Emergency ramp starts" : "Call window opens; ramp starts as planned"]);
+    if (lim >= P.call + 15) L.push([hhmm(P.call + 15), "Ramp complete: " + fmt(P.fx - holdF, 1) + " MW relieved"]);
+    if (P.ovr && lim >= P.ovrAt) L.push([hhmm(P.ovrAt), "Customer override on 50% of flexible work; logged, settled pro rata"]);
+    if (lim >= P.endHold) L.push([hhmm(P.endHold), "Call released; work resumes over 15 min"]);
+    if (lim >= P.endHold + 15) L.push([hhmm(P.endHold + 15), "Rebound: +5% for 30 min as paused jobs catch up"]);
+    if (lim >= 180) L.push([hhmm(180), "Independent verifier (TTE): " + (contract > 0 ? Math.round(shed / contract * 100) : 0) + "% of contracted energy delivered; protected load untouched"]);
+    $("log").innerHTML = L.map(r => `<div><b>${r[0]}</b><span>${r[1]}</span></div>`).join("");
+  }
+  function runEvent() {
+    clearInterval(evTimer); evT = 0;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { drawEvent(180); return; }
+    evTimer = setInterval(() => { evT += 3; drawEvent(evT); if (evT >= 180) clearInterval(evTimer); }, 30);
+  }
+  $("runEv").addEventListener("click", runEvent);
+  $("dur").addEventListener("input", e => { $("durLbl").textContent = e.target.value + " min"; drawEvent(180); });
+  $("ovr").addEventListener("change", () => drawEvent(180));
+  $("emg").addEventListener("change", () => drawEvent(180));
+  $("durLbl").textContent = $("dur").value + " min";
+
+  /* ---------- 5. value engine ---------- */
+  const SL = [
+    ["CNF", "Package fee", 10, 50, 1, 25, v => "₹" + v + " lakh / IT MW", "Priced hypothesis; Gate 0 tests ₹18-40 lakh"],
+    ["CN2", "Agreements a year from FY33", 0.5, 3, 0.5, 2, v => fmt(v, 1), "FY30-FY32 run at 1 a year (half that if this is below 2)"],
+    ["PE", "Campuses energised", 0.4, 0.95, 0.05, 0.70, v => Math.round(v * 100) + "%", "Second fee milestone is paid only on energisation"],
+    ["P1", "Software fee share", 0.10, 0.30, 0.01, 0.20, v => Math.round(v * 100) + "%", "Share of the customer's verified saving"],
+    ["F1", "Daily building flex", 0.05, 0.30, 0.01, 0.15, v => Math.round(v * 100) + "% of IT", "Pre-cooling, setpoints, dedicated storage; team estimate, 25% ceiling"],
+    ["ESP", "Residual risk premium", 0, 0.15, 0.01, 0.05, v => Math.round(v * 100) + "%", "On top of CAPM 14.8%"],
+    ["RAF", "Readiness study fee", 0.15, 0.6, 0.05, 0.35, v => "₹" + Math.round(v * 100) + " lakh", "Paid whatever the utility decides"],
+  ];
+  const V = {}; SL.forEach(s => V[s[0]] = s[5]); V.CAT = "HTI";
+  $("sliders").innerHTML = SL.map(s => `<div class="sl"><div class="sl-top"><label for="sl_${s[0]}">${s[1]}</label><b id="lv_${s[0]}"></b></div>
+    <input type="range" id="sl_${s[0]}" min="${s[2]}" max="${s[3]}" step="${s[4]}" value="${s[5]}"><small>${s[7]}</small></div>`).join("") +
+    `<div class="sl"><div class="sl-top"><span>Tariff category</span></div><div class="seg" id="engCat"><button type="button" aria-pressed="true" data-v="HTI">HT I registered</button><button type="button" aria-pressed="false" data-v="HTII">HT II</button></div><small>Registered IT/ITeS units pay HT I (₹7.45/kVAh in FY30)</small></div>`;
+  function params() { const p = { CNF: V.CNF, CN2: V.CN2, CN1: V.CN2 >= 2 ? 1 : V.CN2 / 2, PE: V.PE, P1: V.P1, F1: V.F1, ESP: V.ESP, RAF: V.RAF, T1: V.CAT === "HTI" ? 7.45 : 12.23 }; return p; }
+  function isDefault() { return SL.every(s => Math.abs(V[s[0]] - s[5]) < 1e-9) && V.CAT === "HTI"; }
+  function drawEngine() {
+    SL.forEach(s => $("lv_" + s[0]).textContent = s[6](V[s[0]]));
+    const p = params(), m = runModel(p), C = m.C, B = m.B, be = breakEvenFee(p);
+    $("vNpv").textContent = crore(C.npvTotal);
+    $("vNpvBox").className = "hero-n" + (C.npvTotal < 0 ? " neg" : "");
+    $("vRate").textContent = "at " + fmt(m.rate * 100, 1) + "% · Case C";
+    $("vIrr").textContent = C.irr == null ? "n/a" : Math.round(C.irr * 100) + "%";
+    $("vBe").textContent = be == null ? "> 100" : fmt(be, 1);
+    $("vB").textContent = crore(B.npvTotal);
+    $("vEbd").textContent = C.ebdPos ? "FY" + String(C.ebdPos).slice(2) : "After FY36";
+    $("vPay").textContent = C.payback ? "FY" + String(C.payback).slice(2) : "After FY36";
+    $("vPeak").textContent = "₹" + fmt(C.peak, 1) + " cr";
+    $("vOdds").textContent = m.oddsToday == null ? "Not viable" : (m.oddsToday === 0 ? "Floor positive" : Math.round(m.oddsToday * 100) + "%");
+    $("match").innerHTML = isDefault() ? "At these settings the engine matches Excel model v7: Case C NPV +₹3.1 cr, IRR 29%." : "Off the v7 base case: upside levers are not in the base; each must pass a gate.";
+    document.querySelectorAll("#presets button").forEach(b => { const pr = PRE[b.dataset.p]; b.setAttribute("aria-pressed", Object.keys(Object.assign({}, PRE.base, pr)).every(k => Math.abs(V[k] - Object.assign({}, PRE.base, pr)[k]) < 1e-9) && V.CAT === "HTI" ? "true" : "false"); });
+    // chart
+    const W = 720, H = 280, x0 = 44, y0 = 236, top = 20;
+    const vals = C.f.rev.concat(B.f.rev, C.f.ebd, B.f.ebd);
+    const max = Math.max(10, Math.ceil(Math.max(...vals) / 10) * 10), min = Math.min(0, Math.floor(Math.min(...vals) / 5) * 5);
+    const Y = v => top + (max - v) / (max - min) * (y0 - top);
+    let g = "";
+    const step = max - min > 40 ? 10 : 5;
+    for (let v = min; v <= max; v += step) g += `<line x1="${x0}" x2="${W - 10}" y1="${Y(v)}" y2="${Y(v)}" stroke="${v === 0 ? "#2E2E38" : "#E6E6EC"}"/><text x="${x0 - 8}" y="${Y(v) + 5}" font-size="14" text-anchor="end">${v}</text>`;
+    const bw = (W - x0 - 20) / 10;
+    YEARS.forEach((y, i) => {
+      const x = x0 + 8 + i * bw;
+      const rb = B.f.rev[i], rc = C.f.rev[i];
+      g += `<rect x="${x}" y="${Y(Math.max(0, rb))}" width="${bw * 0.34}" height="${Math.abs(Y(rb) - Y(0))}" fill="#C9C9D3"/>`;
+      g += `<rect x="${x + bw * 0.36}" y="${Y(Math.max(0, rc))}" width="${bw * 0.34}" height="${Math.abs(Y(rc) - Y(0))}" fill="#1A9AFA"/>`;
+      g += `<text x="${x + bw * 0.35}" y="${H - 14}" font-size="14" text-anchor="middle">FY${String(y).slice(2)}</text>`;
+    });
+    let path = ""; YEARS.forEach((y, i) => { const x = x0 + 8 + i * bw + bw * 0.35; path += (i ? "L" : "M") + x + " " + Y(C.f.ebd[i]) + " "; });
+    g += `<path d="${path}" stroke="#2E2E38" stroke-width="5" fill="none"/><path d="${path}" stroke="#FFE600" stroke-width="3" fill="none"/>`;
+    YEARS.forEach((y, i) => { const x = x0 + 8 + i * bw + bw * 0.35; g += `<circle cx="${x}" cy="${Y(C.f.ebd[i])}" r="4" fill="#FFE600" stroke="#2E2E38" stroke-width="1.5"/>`; });
+    $("finChart").innerHTML = g;
+  }
+  SL.forEach(s => $("sl_" + s[0]).addEventListener("input", e => { V[s[0]] = +e.target.value; drawEngine(); }));
+  $("engCat").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; $("engCat").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false")); V.CAT = b.dataset.v; drawEngine(); });
+  const PRE = { base: { CNF: 25, CN2: 2, F1: 0.15 }, L1: { CNF: 40 }, L2: { CN2: 3 }, L12: { CNF: 40, CN2: 3 }, L12_F8: { CNF: 40, CN2: 3, F1: 0.08 } };
+  $("presets").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+    SL.forEach(s => { V[s[0]] = s[5]; }); Object.assign(V, PRE.base, PRE[b.dataset.p]); V.CAT = "HTI";
+    SL.forEach(s => { $("sl_" + s[0]).value = V[s[0]]; }); $("engCat").querySelectorAll("button").forEach((x, i) => x.setAttribute("aria-pressed", i === 0 ? "true" : "false")); drawEngine(); });
+  $("reset").addEventListener("click", () => { SL.forEach(s => { V[s[0]] = s[5]; $("sl_" + s[0]).value = s[5]; }); V.CAT = "HTI"; $("engCat").querySelectorAll("button").forEach((x, i) => x.setAttribute("aria-pressed", i === 0 ? "true" : "false")); drawEngine(); });
+
+  /* ---------- station rail highlight ---------- */
+  const links = [...document.querySelectorAll(".stations a")];
+  const io = new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecting) links.forEach(a => a.classList.toggle("on", a.getAttribute("href") === "#" + en.target.id)); }), { rootMargin: "-45% 0px -50% 0px" });
+  ["day", "sort", "ticket", "event", "value"].forEach(id => io.observe($(id)));
+
+  drawDay(); drawSort(); drawEvent(180); drawEngine();
+})();
+</script>
